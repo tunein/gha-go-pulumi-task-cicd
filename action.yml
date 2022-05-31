@@ -1,0 +1,45 @@
+name: 'Pulumi GHA'
+description: 'Composite action for Pulumi with Golang and Task'
+inputs:
+  go-version:
+    description: 'Golang version'
+    required: false
+    default: 1.18.x
+  role-to-assume:
+    description: 'AWS role to assume (configure-aws-credentials)'
+    required: true
+  aws-region:
+    description: 'AWS region (configure-aws-credentials). Default: us-west-2'
+    required: false
+    default: us-west-2
+  gh_pat:
+    description: 'GitHub personal access token (deploy user access token)'
+    required: true
+  task:
+    description: 'Name of a Task to execute'
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Install Golang
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ inputs.go-version }}
+    - name: Install Task
+      uses: arduino/setup-task@v1
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@master
+      with:
+        role-to-assume: ${{ inputs.role-to-assume }}
+        role-session-name: gha-${{ env.GITHUB_SHA }}
+        aws-region: ${{ inputs.aws-region }}
+    - name: Configure git for private modules
+      shell: bash
+      run: git config --global url."https://${TOKEN}@github.com/tunein".insteadOf "https://github.com/tunein"
+      env:
+        TOKEN: ${{ inputs.gh_pat }}
+    - name: Task
+      shell: bash
+      run: task ${{ inputs.task }}
+      env:
+        GH_PAT: ${{ inputs.gh_pat }}
