@@ -18,6 +18,10 @@ inputs:
   task:
     description: 'Name of a Task to execute'
     required: true
+outputs:
+  task_stdout:
+    description: "Task stdout"
+    value: ${{ steps.prepare-output.outputs.task_stdout }}
 runs:
   using: composite
   steps:
@@ -43,3 +47,18 @@ runs:
       run: task ${{ inputs.task }}
       env:
         GH_PAT: ${{ inputs.gh_pat }}
+    - name: Prepare output
+      if: hashFiles('stdout.txt') != ''
+      id: prepare-output
+      shell: bash
+      run: |
+        garbage_lines=2
+        diagnostic_line=$(awk '/Diagnostics:/{ print NR; exit }' stdout.txt)
+        [ ! -z "$diagnostic_line" ] || garbage_lines=0
+        [ ! -z "$diagnostic_line" ] || diagnostic_line=$(wc -l < stdout.txt) 
+        end_line=$(( $diagnostic_line - $garbage_lines ))
+        task_stdout=$( head -$end_line stdout.txt )
+        task_stdout="${task_stdout//'%'/'%25'}"
+        task_stdout="${task_stdout//$'\n'/'%0A'}"
+        task_stdout="${task_stdout//$'\r'/'%0D'}"
+        echo "::set-output name=task_stdout::$task_stdout"
